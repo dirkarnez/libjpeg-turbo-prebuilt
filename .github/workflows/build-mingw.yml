@@ -1,0 +1,45 @@
+name: cpp-cmake-mingw-prebuilt-release-actions-workflow
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+  
+jobs:
+  build:
+    name: Create Release
+    runs-on: windows-2019
+    env:
+      libraryName: libjpeg-turbo
+      cmakeInstallationPath: libjpeg-turbo-installation
+      tagName: 2.1.3
+      mingwTargetZip: libjpeg-turbo-${{ github.ref_name }}-x86_64-posix-seh-rev0-8.1.0.zip
+    steps:
+      - name: check mingw version
+        run: gcc --version
+        
+      - name: git clone
+        shell: cmd
+        run: git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git && cd libjpeg-turbo && git checkout ${{ env.tagName }}
+
+      - name: cmake
+        shell: cmd
+        run: cd libjpeg-turbo && cmake.exe -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS_RELEASE="-O3 -g -fno-sanitize-recover=all -fPIE" -DBUILD_SHARED_LIBS=OFF -DWITH_SIMD=1 -DCMAKE_INSTALL_PREFIX="build/${{ env.cmakeInstallationPath }}" -B./build
+        
+      - name: cmake build and install
+        shell: cmd
+        run: cd libjpeg-turbo\build && cmake --build . && cmake --install .
+        
+      - name: Archive Release
+        uses: thedoctor0/zip-release@master
+        with:
+          type: 'zip'
+          directory: "libjpeg-turbo/build/${{ env.cmakeInstallationPath }}"
+          filename: "${{ env.mingwTargetZip }}"
+          
+      - name: Release prebuilt
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "libjpeg-turbo/build/${{ env.cmakeInstallationPath }}/${{ env.mingwTargetZip }}"
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
